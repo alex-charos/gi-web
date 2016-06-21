@@ -1,9 +1,11 @@
 var express 			= require('express');
 var sys 				= require('sys');
 var exec 				= require('child_process').exec;
+var execSync			= require('child_process').execSync;
 var fs 					= require('fs');
 var app 				= express();
-var gi_issue_root_dir 	= '.issues/issues';
+var gi_issue_git_dir 	= '.issues';
+var gi_issue_root_dir 	=  gi_issue_git_dir + '/issues';
 
 app.get('/', function (req, res) {
 	
@@ -39,14 +41,44 @@ function constructIssue(issueId, directory) {
 
 	var tags = fs.readFileSync(directory+'/tags').toString().split("\n");
 	tags.splice(tags.length-1, 1);
-	 
+	var comments = retrieveComments(issueId, directory);
+
 	return {id:issueId,
 			header:header,
 			description : description,
-			tags : tags
+			tags : tags,
+			comments: comments
 	};
 
 }
+
+function retrieveComments(issueId, directory) {
+	 
+	var commentsRoot = execSync("cd " + gi_issue_git_dir + " && git log --reverse --grep='^gi comment mark "+issueId+"' --format='%H'").toString().split("\n");
+	var comments = [];
+	console.log(commentsRoot);
+	try {
+	 
+	 	for (var i =0; i < commentsRoot.length; i++) {
+	 		console.log("Retrieving for " + commentsRoot[i]);
+	 		var metadata =  execSync("cd " + gi_issue_git_dir + " && git show --no-patch --format='auth:[authStart[%an <%ae>]authEnd] date:[dateStart[%aD]dateEnd]' " + commentsRoot[i]).toString();
+	 		var author =	metadata.substring(metadata.indexOf("[authStart[") + 11, metadata.indexOf("]authEnd]") );
+	 		var date =      metadata.substring(metadata.indexOf("[dateStart[") + 11, metadata.indexOf("]dateEnd]") );
+
+	 		var cm = fs.readFileSync(directory+'/comments/'+commentsRoot[i]).toString();
+	 		comments.push({
+	 			description:cm,
+	 		 	author: author,
+	 			date: date
+	 		});
+	 	}
+	 	 
+	 } catch (e) {
+
+	 }
+	 return comments;
+}
+
 
 app.get('/issues/', function (req, res) {
 	
