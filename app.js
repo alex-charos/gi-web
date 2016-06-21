@@ -6,28 +6,57 @@ var fs 					= require('fs');
 var app 				= express();
 var gi_issue_git_dir 	= '.issues';
 var gi_issue_root_dir 	=  gi_issue_git_dir + '/issues';
+var bodyParser = require('body-parser');
+
+app.use(bodyParser.json()); // support json encoded bodies
 
 app.get('/', function (req, res) {
-	
-	 
-		res.send(gi_list());
-	 
-	
+	res.send(giList());
 });
 
-function gi_list() {
+app.get('/issues/', function (req, res) {
+	var issueId = req.query["id"];
+	console.log( issueId );
+	res.send(getIssue(issueId, gi_issue_root_dir+'/'+issueId.substring(0,2)+'/'+issueId.substring(2)));
+	
+});
+app.post('/', function(req, res) {
+	var issueId = req.body.id;
+	if (issueId === undefined) {
+		console.log('new issue...');
+		var issue = createIssue(req.body);
+		issueId = issue.id;
+	}
+
+	res.send(getIssue(issueId, gi_issue_root_dir+'/'+issueId.substring(0,2)+'/'+issueId.substring(2)));
+
+})
+
+function createIssue(issue) {
+	var issueShortId = execSync("gi new -s \""+ issue.header+"\"").toString().split("\n")[1].split(" ")[2];
+	
+	var issueId 	 = execSync("gi show " + issueShortId).toString().split("\n")[0].split(" ")[1];
+	console.log(issueId);
+
+	issue.id = issueId;
+
+	return issue;
+	
+}
+
+function giList() {
 	var issues = [];
 	 var issuesDir = getDirectoryContents(gi_issue_root_dir);
 	 for (var i=0; i < issuesDir.length; i++) {
 	 	var issueDir = getDirectoryContents(gi_issue_root_dir+'/'+ issuesDir[i]);
 	 	var issueId = issuesDir[i]+issueDir[0];
 
-	 	 issues.push(constructIssue(issueId, gi_issue_root_dir+'/'+issuesDir[i]+'/'+issueDir[0]));
+	 	 issues.push(getIssue(issueId, gi_issue_root_dir+'/'+issuesDir[i]+'/'+issueDir[0]));
 	 }
 	 return issues;
 }
 
-function constructIssue(issueId, directory) {
+function getIssue(issueId, directory) {
 	var headerAndDescription = fs.readFileSync(directory+'/description').toString().split("\n");
 	var header = headerAndDescription[0];
 	var description ='';
@@ -59,9 +88,7 @@ function retrieveAssignee(directory) {
 	var assignee = undefined;
 	try {
 		assignee = fs.readFileSync(directory+'/assignee').toString().split("\n")[0];
-		
 	} catch (error) {
-
 	}
 	return assignee;
 }
@@ -89,14 +116,14 @@ function getTableFromDir(directory) {
 function retrieveComments(issueId, directory) {
 	var commentsRoot = execSync("cd " + gi_issue_git_dir + " && git log --reverse --grep='^gi comment mark "+issueId+"' --format='%H'").toString().split("\n");
 	var comments = [];
-	console.log(commentsRoot);
+	 
 	try {
 	 
 	 	for (var i =0; i < commentsRoot.length; i++) {
-	 		console.log("Retrieving for " + commentsRoot[i]);
+	 		 
 	 		var metadata =  execSync("cd " + gi_issue_git_dir + " && git show --no-patch --format='auth:[authStart[%an <%ae>]authEnd] date:[dateStart[%aD]dateEnd]' " + commentsRoot[i]).toString();
-	 		var author =	metadata.substring(metadata.indexOf("[authStart[") + 11, metadata.indexOf("]authEnd]") );
-	 		var date =      metadata.substring(metadata.indexOf("[dateStart[") + 11, metadata.indexOf("]dateEnd]") );
+	 		var author   =	metadata.substring(metadata.indexOf("[authStart[") + 11, metadata.indexOf("]authEnd]") );
+	 		var date     =  metadata.substring(metadata.indexOf("[dateStart[") + 11, metadata.indexOf("]dateEnd]") );
 
 	 		var cm = fs.readFileSync(directory+'/comments/'+commentsRoot[i]).toString();
 	 		comments.push({
@@ -113,44 +140,12 @@ function retrieveComments(issueId, directory) {
 }
 
 
-app.get('/issues/', function (req, res) {
-	
-	console.log(req.query["id"] );
-	gi_list(function(issues) {
-		res.send(issues);
-	});
-	
-});
 
 function getDirectoryContents(dir) {
 	return fs.readdirSync(dir);
 }
 
-function gi_issue(issueId, callback) {
-	exec("gi list", function(error, stdout, stderr) {
-		
-		if (stdout.length >0) {
-			var issuesRaw = stdout.split("\n");
-			var issues = [];
-			for (var i =0; i<issuesRaw.length-1; i++) {
-				issues.push(deserializeIssue(issuesRaw[i]));
-			}
-
-			callback(issues);
-			
-		}
-	});
-}
-
-
-
-function deserializeIssue(raw) {
-	var id =	raw.split(" ")[0];
-	var descr = raw.substring(raw.indexOf(" ")+1);
-	return {id:id, header:descr};
-
-}
-
+ 
 app.listen(3000, function () {
   console.log('Listening on port 3000!');
 });

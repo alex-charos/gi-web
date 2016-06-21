@@ -4,6 +4,7 @@
   "description": "web interface for gi issue management tool",
   "main": "index.js",
   "dependencies": {
+    "body-parser": "^1.15.2",
     "express": "^4.14.0",
     "sys": "0.0.1"
   },
