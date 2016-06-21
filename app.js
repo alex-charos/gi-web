@@ -39,21 +39,54 @@ function constructIssue(issueId, directory) {
 		}
 	}
 
-	var tags = fs.readFileSync(directory+'/tags').toString().split("\n");
-	tags.splice(tags.length-1, 1);
-	var comments = retrieveComments(issueId, directory);
-
+	var tags     = retrieveTags(directory)
+	var comments = retrieveComments(directory);
+	var watchers = retrieveWatchers(directory);
+	var assignee = retrieveAssignee(directory);
 	return {id:issueId,
 			header:header,
 			description : description,
 			tags : tags,
-			comments: comments
+			comments: comments,
+			watchers: watchers,
+			assignee: assignee
 	};
 
 }
 
+
+function retrieveAssignee(directory) {
+	var assignee = undefined;
+	try {
+		assignee = fs.readFileSync(directory+'/assignee').toString().split("\n")[0];
+		
+	} catch (error) {
+
+	}
+	return assignee;
+}
+
+
+function retrieveTags(directory) {
+	return getTableFromDir(directory+'/tags');
+}
+
+function retrieveWatchers(directory) {
+	return getTableFromDir(directory+'/watchers');
+}
+
+function getTableFromDir(directory) {
+	var table = [];
+	try {
+		table = fs.readFileSync(directory).toString().split("\n");
+		table.splice(table.length-1, 1);
+	} catch (error) {
+
+	}
+	return table;
+}
+
 function retrieveComments(issueId, directory) {
-	 
 	var commentsRoot = execSync("cd " + gi_issue_git_dir + " && git log --reverse --grep='^gi comment mark "+issueId+"' --format='%H'").toString().split("\n");
 	var comments = [];
 	console.log(commentsRoot);
